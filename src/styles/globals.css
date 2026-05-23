@@ -1,0 +1,87 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: "Inter", sans-serif;
+}
+
+.light {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #050505;
+}
+
+.light body {
+  background: #f8fbff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(0, 217, 255, 0.35);
+}
+
+.animated-grid {
+  background-image:
+    linear-gradient(rgba(0, 217, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.12) 1px, transparent 1px);
+  background-size: 45px 45px;
+}
+
+.glass {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(22px);
+}
+
+.light .glass {
+  border-color: rgba(15, 23, 42, 0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(236, 249, 255, 0.68));
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.cursor-glow {
+  pointer-events: none;
+  position: fixed;
+  inset: auto;
+  z-index: 60;
+  width: 280px;
+  height: 280px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(0, 217, 255, 0.18), transparent 62%);
+  transform: translate(-50%, -50%);
+  mix-blend-mode: screen;
+}
+
+.light .cursor-glow {
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.18), transparent 62%);
+  mix-blend-mode: multiply;
+}
+
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.tilt-card:hover {
+  transform: perspective(900px) rotateX(4deg) rotateY(-5deg) translateY(-6px);
+}
