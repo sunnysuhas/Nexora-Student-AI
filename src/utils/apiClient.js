@@ -111,9 +111,8 @@ export async function apiAvailable() {
   try {
     const response = await fetch(`${API_BASE_URL}/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000), // increase to 30 seconds
     });
-
     return response.ok;
   } catch (error) {
     console.error("API health check failed:", error);
@@ -122,18 +121,12 @@ export async function apiAvailable() {
 }
 
 export async function assertApiAvailable() {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 5; i++) {  // increase retries to 5
     const online = await apiAvailable();
-
-    if (online) {
-      return;
-    }
-
-    if (i < 2) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
+    if (online) return;
+    console.log(`Health check attempt ${i + 1} failed, retrying...`);
+    if (i < 4) await new Promise((resolve) => setTimeout(resolve, 5000)); // 5s gap
   }
-
   throw new Error(
     `Nexora backend server is offline or blocked by CORS. Confirm the API is running at ${API_BASE_URL}`
   );
