@@ -1,6 +1,6 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { connectDatabase } from "./lib/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import taskRoutes from "./routes/task.routes.js";
@@ -16,12 +16,30 @@ import adminRoutes from "./routes/admin.routes.js";
 import { seedDevelopmentAdmin } from "./services/seedAdmin.js";
 import { errorHandler } from "./middleware/error.js";
 
-dotenv.config();
-
 const app = express();
 const port = process.env.PORT || 5000;
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  process.env.CLIENT_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+  ...(process.env.ALLOWED_ORIGINS || "").split(","),
+]
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://127.0.0.1:5173" }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.get("/api/health", (_request, response) => {
@@ -48,11 +66,15 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/contact", contactRoutes);
 app.use(errorHandler);
 
-connectDatabase().then(async (connection) => {
-  if (connection) {
+connectDatabase()
+  .then(async () => {
     await seedDevelopmentAdmin();
-  }
-  app.listen(port, () => {
-    console.log(`Nexora API running on http://localhost:${port}`);
+    app.listen(port, () => {
+      console.log(`✅ Nexora API Running: http://localhost:${port}`);
+      console.log(`✅ Allowed frontend origins: ${allowedOrigins.join(", ")}`);
+    });
+  })
+  .catch((error) => {
+    console.error("❌ MongoDB Failed", error.message);
+    process.exit(1);
   });
-});

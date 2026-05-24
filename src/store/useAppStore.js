@@ -12,7 +12,7 @@ import {
   notificationService,
   taskService,
 } from "../services/api";
-import { clearTokens, getAccessToken } from "../utils/apiClient";
+import { ApiError, clearTokens, getAccessToken } from "../utils/apiClient";
 import { buildDailyNotifications, normalizeId } from "../utils/productivity";
 
 const makeId = () => crypto.randomUUID();
@@ -95,7 +95,11 @@ async function withApi(set, action) {
     set({ apiStatus: "online", lastError: "" });
     return { ok: true, result };
   } catch (error) {
-    set({ apiStatus: "error", lastError: error.message || "API unavailable" });
+    if (error instanceof ApiError) {
+      set({ apiStatus: "online", lastError: "" });
+    } else {
+      set({ apiStatus: "error", lastError: error.message || "API unavailable" });
+    }
     return { ok: false, error };
   }
 }
@@ -107,6 +111,7 @@ export const useAppStore = create(
       apiStatus: "checking",
       lastError: "",
       isAuthenticated: false,
+      rememberSession: true,
       currentUser: null,
       pendingVerificationEmail: "",
       profile: emptyProfile,
@@ -222,12 +227,13 @@ export const useAppStore = create(
         const response = await withApi(set, () => authService.resendOtp({ email }));
         return response.ok ? { ok: true } : { ok: false, reason: response.error?.message || "Unable to resend OTP." };
       },
-      login: async (email, password) => {
-        const response = await withApi(set, () => authService.login({ email, password }));
+      login: async (email, password, remember = true) => {
+        const response = await withApi(set, () => authService.login({ email, password, remember }));
         if (response.ok) {
           const user = mapUser(response.result.user);
           set({
             isAuthenticated: true,
+            rememberSession: remember,
             currentUser: user,
             profile: user.profile,
             onboardingComplete: user.onboardingComplete,
@@ -237,13 +243,23 @@ export const useAppStore = create(
           get().syncNotifications();
           return { ok: true, user };
         }
+        if (response.error?.code === "EMAIL_NOT_VERIFIED") {
+          set({ pendingVerificationEmail: response.error.payload?.email || email });
+          return {
+            ok: false,
+            verificationRequired: true,
+            email: response.error.payload?.email || email,
+            reason: response.error?.message || "Account not verified. Please verify your email.",
+          };
+        }
         return { ok: false, reason: response.error?.message || "Invalid email or password." };
       },
       forgotPassword: async (email) => withApi(set, () => authService.forgotPassword({ email })),
       resetPassword: async (payload) => withApi(set, () => authService.resetPassword(payload)),
       logout: () => {
+        authService.logout().catch(() => undefined);
         clearTokens();
-        set({ apiStatus: "checking", lastError: "", isAuthenticated: false, currentUser: null, onboardingComplete: false, ...emptyWorkspace() });
+        set({ apiStatus: "checking", lastError: "", isAuthenticated: false, rememberSession: true, currentUser: null, onboardingComplete: false, ...emptyWorkspace() });
       },
       completeOnboarding: async (profileUpdate) => {
         const profile = { ...get().profile, ...profileUpdate };
@@ -532,11 +548,12 @@ export const useAppStore = create(
       name: "nexora-ai-saas-storage",
       partialize: (state) => ({
         theme: state.theme,
-        isAuthenticated: state.isAuthenticated,
-        currentUser: state.currentUser,
+        rememberSession: state.rememberSession,
+        isAuthenticated: state.rememberSession ? state.isAuthenticated : false,
+        currentUser: state.rememberSession ? state.currentUser : null,
         pendingVerificationEmail: state.pendingVerificationEmail,
-        profile: state.profile,
-        onboardingComplete: state.onboardingComplete,
+        profile: state.rememberSession ? state.profile : emptyProfile,
+        onboardingComplete: state.rememberSession ? state.onboardingComplete : false,
         notifications: state.notifications,
         compactMode: state.compactMode,
         accentColor: state.accentColor,

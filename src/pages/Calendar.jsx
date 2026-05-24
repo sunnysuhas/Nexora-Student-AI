@@ -41,7 +41,7 @@ export function Calendar() {
             <CalendarClock className="h-6 w-6 text-cyan-500" />
           </div>
           <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-            {["M", "T", "W", "T", "F", "S", "S"].map((day) => <span key={day}>{day}</span>)}
+            {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}
           </div>
           <div className="mt-3 grid grid-cols-7 gap-2">
             {days.map((day) => {

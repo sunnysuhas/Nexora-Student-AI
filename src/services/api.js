@@ -1,16 +1,33 @@
-import { apiRequest, apiRoutes, saveTokens } from "../utils/apiClient";
+import { apiRequest, apiRoutes, assertApiAvailable, saveTokens } from "../utils/apiClient";
 
 export const authService = {
-  register: (payload) => apiRequest(apiRoutes.auth.register, { method: "POST", body: JSON.stringify(payload) }),
-  verifyOtp: (payload) => apiRequest(apiRoutes.auth.verifyOtp, { method: "POST", body: JSON.stringify(payload) }),
-  resendOtp: (payload) => apiRequest("/auth/resend-otp", { method: "POST", body: JSON.stringify(payload) }),
+  register: async (payload) => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.register, { method: "POST", body: JSON.stringify(payload) });
+  },
+  verifyOtp: async (payload) => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.verifyOtp, { method: "POST", body: JSON.stringify(payload) });
+  },
+  resendOtp: async (payload) => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.resendOtp, { method: "POST", body: JSON.stringify(payload) });
+  },
   login: async (payload) => {
+    await assertApiAvailable();
     const data = await apiRequest(apiRoutes.auth.login, { method: "POST", body: JSON.stringify(payload) });
-    saveTokens(data);
+    saveTokens(data, payload.remember !== false);
     return data;
   },
-  forgotPassword: (payload) => apiRequest(apiRoutes.auth.forgotPassword, { method: "POST", body: JSON.stringify(payload) }),
-  resetPassword: (payload) => apiRequest(apiRoutes.auth.resetPassword, { method: "POST", body: JSON.stringify(payload) }),
+  logout: () => apiRequest(apiRoutes.auth.logout, { method: "POST" }),
+  forgotPassword: async (payload) => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.forgotPassword, { method: "POST", body: JSON.stringify(payload) });
+  },
+  resetPassword: async (payload) => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.resetPassword, { method: "POST", body: JSON.stringify(payload) });
+  },
   me: () => apiRequest(apiRoutes.auth.me),
   profile: (payload) => apiRequest(apiRoutes.auth.profile, { method: "PATCH", body: JSON.stringify(payload) }),
   onboarding: (payload) => apiRequest(apiRoutes.auth.onboarding, { method: "POST", body: JSON.stringify(payload) }),

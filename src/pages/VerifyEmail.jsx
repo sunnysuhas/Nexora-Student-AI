@@ -14,13 +14,24 @@ export function VerifyEmail() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedCode = code.trim();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setError("Enter the email address you registered with.");
+      return;
+    }
+    if (!/^\d{6}$/.test(normalizedCode)) {
+      setError("Enter the 6-digit OTP from your email.");
+      return;
+    }
     setLoading(true);
     setError("");
     setNotice("");
-    const result = await verifyUser(email.trim().toLowerCase(), code.trim());
+    const result = await verifyUser(normalizedEmail, normalizedCode);
     setLoading(false);
     if (!result.ok) {
       setError(result.reason || "Invalid verification code.");
@@ -30,14 +41,21 @@ export function VerifyEmail() {
   };
 
   const resend = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setError("Enter your registered email before requesting a new OTP.");
+      return;
+    }
     setError("");
     setNotice("");
-    const result = await resendOtp(email.trim().toLowerCase());
+    setResending(true);
+    const result = await resendOtp(normalizedEmail);
+    setResending(false);
     if (!result.ok) {
       setError(result.reason || "Unable to resend OTP.");
       return;
     }
-    setNotice("A fresh OTP has been sent to your email.");
+    setNotice("A fresh 6-digit OTP has been sent to your email.");
   };
 
   return (
@@ -54,11 +72,18 @@ export function VerifyEmail() {
         </p>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" />
-          <Input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Verification code" />
+          <Input
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            placeholder="6-digit verification code"
+          />
           {notice && <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-300">{notice}</p>}
           {error && <p className="text-sm font-semibold text-rose-500">{error}</p>}
           <Button type="submit" disabled={loading} className="w-full">{loading ? "Verifying..." : "Verify and continue to login"}</Button>
-          <Button type="button" variant="secondary" onClick={resend} className="w-full">Resend OTP</Button>
+          <Button type="button" variant="secondary" onClick={resend} disabled={resending} className="w-full">
+            {resending ? "Sending..." : "Resend OTP"}
+          </Button>
         </form>
       </Card>
     </div>

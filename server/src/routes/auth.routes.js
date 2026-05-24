@@ -5,6 +5,7 @@ import {
   deleteProfileImage,
   forgotPassword,
   login,
+  logout,
   me,
   refresh,
   register,
@@ -24,6 +25,7 @@ router.post("/verify-otp", verifyOtp);
 router.post("/resend-otp", resendOtp);
 router.post("/login", login);
 router.post("/refresh", refresh);
+router.post("/logout", requireAuth, logout);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.get("/me", requireAuth, me);

@@ -44,6 +44,7 @@ export function Auth({ mode }) {
   const { registerUser, login, forgotPassword, resetPassword, apiStatus, lastError } = useAppStore();
   const navigate = useNavigate();
   const details = copy[mode];
+  const showApiBanner = apiStatus === "error" && isConnectionError(lastError);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -54,6 +55,7 @@ export function Auth({ mode }) {
     const otp = form.get("otp")?.toString().trim() || "";
     const name = form.get("name")?.toString().trim() || "";
     const username = form.get("username")?.toString().trim().toLowerCase() || "";
+    const remember = form.get("remember") === "on";
     const nextErrors = {};
 
     if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email.";
@@ -81,8 +83,12 @@ export function Auth({ mode }) {
         setNotice("Password reset complete. You can log in now.");
         return;
       }
-      await forgotPassword(email);
+      const result = await forgotPassword(email);
       setLoading(false);
+      if (!result.ok) {
+        setErrors({ form: result.error?.message || "Unable to send reset OTP." });
+        return;
+      }
       setResetRequested(true);
       setNotice("If this email exists, a reset OTP has been sent.");
       return;
@@ -99,9 +105,13 @@ export function Auth({ mode }) {
       return;
     }
 
-    const result = await login(email, password);
+    const result = await login(email, password, remember);
     setLoading(false);
     if (!result.ok) {
+      if (result.verificationRequired) {
+        navigate("/verify-email");
+        return;
+      }
       setErrors({ form: result.reason });
       return;
     }
@@ -134,7 +144,7 @@ export function Auth({ mode }) {
           </Link>
           <h2 className="font-display text-3xl font-bold">{details.title}</h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{details.subtitle}</p>
-          {apiStatus === "error" && (
+          {showApiBanner && (
             <p className="mt-4 rounded-lg bg-amber-400/15 p-3 text-sm font-semibold text-amber-700 dark:text-amber-200">
               Nexora API is unavailable: {lastError || "please confirm the backend is running."}
             </p>
@@ -187,9 +197,20 @@ export function Auth({ mode }) {
             )}
 
             {mode === "login" && (
-              <Link to="/forgot-password" className="block text-right text-sm font-semibold text-cyan-600 dark:text-cyan-300">
-                Forgot password?
-              </Link>
+              <div className="flex items-center justify-between gap-3">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                  <input
+                    name="remember"
+                    type="checkbox"
+                    defaultChecked
+                    className="h-4 w-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-400"
+                  />
+                  Remember me
+                </label>
+                <Link to="/forgot-password" className="text-sm font-semibold text-cyan-600 dark:text-cyan-300">
+                  Forgot password?
+                </Link>
+              </div>
             )}
             {notice && <p className="rounded-lg bg-emerald-400/15 p-3 text-sm font-semibold text-emerald-600 dark:text-emerald-300">{notice}</p>}
             {errors.form && <p className="rounded-lg bg-rose-400/15 p-3 text-sm font-semibold text-rose-600 dark:text-rose-300">{errors.form}</p>}
@@ -208,6 +229,10 @@ export function Auth({ mode }) {
       </section>
     </div>
   );
+}
+
+function isConnectionError(message = "") {
+  return /backend|network|cors|offline|blocked|timeout|timed out|failed to fetch|server/i.test(message);
 }
 
 function Field({ label, error, ...props }) {
