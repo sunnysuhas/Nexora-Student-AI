@@ -1,17 +1,14 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, Filter, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, Filter, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "../layouts/AppShell";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { useAppStore } from "../store/useAppStore";
+import { daysUntil, taskStatus } from "../utils/productivity";
 
-const columns = [
-  { id: "todo", title: "To do" },
-  { id: "doing", title: "In focus" },
-  { id: "review", title: "Review" },
-  { id: "done", title: "Done" },
-];
+const statuses = ["Pending", "In Progress", "Completed", "Overdue"];
+const priorities = ["Low", "Medium", "High"];
 
 const priorityStyles = {
   High: "bg-rose-400/15 text-rose-600 dark:text-rose-300",
@@ -20,127 +17,131 @@ const priorityStyles = {
 };
 
 export function Tasks() {
-  const { tasks, addTask, moveTask, updateTask, deleteTask } = useAppStore();
+  const { tasks, subjects, addTask, updateTask, deleteTask, addNotification } = useAppStore();
   const [filter, setFilter] = useState("All");
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState({
+    title: "",
+    description: "",
+    subject: "",
+    priority: "Medium",
+    deadline: "",
+    reminder: "",
+    tags: "",
+  });
 
   const filteredTasks = useMemo(
-    () => (filter === "All" ? tasks : tasks.filter((task) => task.priority === filter)),
+    () => (filter === "All" ? tasks : tasks.filter((task) => task.priority === filter || taskStatus(task) === filter)),
     [filter, tasks]
   );
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
-    if (!draft.trim()) return;
-    addTask({
-      title: draft.trim(),
-      subject: "General",
-      priority: "Medium",
-      deadline: "Upcoming",
-      progress: 0,
-      status: "todo",
-    });
-    setDraft("");
+    if (!draft.title.trim()) return;
+    const task = {
+      ...draft,
+      title: draft.title.trim(),
+      tags: draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      status: "Pending",
+    };
+    await addTask(task);
+    if (task.deadline) {
+      addNotification({
+        type: "Task",
+        priority: "Medium",
+        title: `Task reminder: ${task.title}`,
+        body: `${task.title} is due on ${task.deadline}.`,
+      });
+    }
+    setDraft({ title: "", description: "", subject: "", priority: "Medium", deadline: "", reminder: "", tags: "" });
   };
 
   return (
-    <AppShell title="Tasks" eyebrow="Drag-and-drop Task Engine">
+    <AppShell title="Tasks" eyebrow="Realistic Student Task Workflow">
       <Card className="mb-4">
-        <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
-          <Input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Add a new task, assignment, or study goal..."
-          />
+        <form onSubmit={submit} className="grid gap-3 lg:grid-cols-2">
+          <Input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Task title" />
+          <Input value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} placeholder={subjects.length ? "Linked subject" : "Linked subject (optional)"} list="task-subjects" />
+          <datalist id="task-subjects">
+            {subjects.map((subject) => <option key={subject.id} value={subject.name || subject.subject} />)}
+          </datalist>
+          <Input value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Description" />
+          <Input value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} placeholder="Tags, comma separated" />
+          <Input type="date" value={draft.deadline} onChange={(event) => setDraft({ ...draft, deadline: event.target.value })} />
+          <Input type="datetime-local" value={draft.reminder} onChange={(event) => setDraft({ ...draft, reminder: event.target.value })} />
           <select
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
+            value={draft.priority}
+            onChange={(event) => setDraft({ ...draft, priority: event.target.value })}
             className="min-h-11 rounded-lg border border-slate-300/70 bg-white/70 px-4 text-sm font-semibold text-slate-900 dark:border-white/15 dark:!bg-slate-950/60 dark:text-white"
           >
-            {["All", "High", "Medium", "Low"].map((item) => (
-              <option key={item}>{item}</option>
-            ))}
+            {priorities.map((item) => <option key={item}>{item}</option>)}
           </select>
-          <Button type="submit">
-            <Plus className="h-4 w-4" />
-            Add Task
-          </Button>
+          <Button type="submit"><Plus className="h-4 w-4" /> Add Task</Button>
         </form>
       </Card>
 
       <div className="mb-4 flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-300">
-        <span className="inline-flex items-center gap-2 rounded-full bg-white/60 px-3 py-2 dark:!bg-slate-950/60">
-          <Filter className="h-4 w-4" />
-          Priority filter: {filter}
-        </span>
-        <span className="inline-flex items-center gap-2 rounded-full bg-white/60 px-3 py-2 dark:!bg-slate-950/60">
-          <SlidersHorizontal className="h-4 w-4" />
-          CRUD + LocalStorage persistence enabled
-        </span>
+        {["All", ...priorities, ...statuses].map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => setFilter(item)}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-2 font-semibold ${filter === item ? "bg-cyan-400/15 text-cyan-700 dark:text-cyan-300" : "bg-white/60 dark:!bg-slate-950/60"}`}
+          >
+            <Filter className="h-4 w-4" />
+            {item}
+          </button>
+        ))}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-4">
-        {columns.map((column) => (
-          <Card
-            key={column.id}
-            className="min-h-[32rem]"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              const id = event.dataTransfer.getData("task-id");
-              if (id) moveTask(id, column.id);
-            }}
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="font-display text-xl font-bold">{column.title}</h2>
-              <span className="rounded-full bg-cyan-400/15 px-2 py-1 text-xs font-bold text-cyan-600 dark:text-cyan-300">
-                {filteredTasks.filter((task) => task.status === column.id).length}
-              </span>
-            </div>
-            <div className="space-y-3">
-              {filteredTasks
-                .filter((task) => task.status === column.id)
-                .map((task) => (
+        {statuses.map((status) => {
+          const columnTasks = filteredTasks.filter((task) => taskStatus(task) === status);
+          return (
+            <Card
+              key={status}
+              className="min-h-[28rem]"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const id = event.dataTransfer.getData("task-id");
+                if (id && status !== "Overdue") updateTask(id, { status });
+              }}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="font-display text-xl font-bold">{status}</h2>
+                <span className="rounded-full bg-cyan-400/15 px-2 py-1 text-xs font-bold text-cyan-600 dark:text-cyan-300">{columnTasks.length}</span>
+              </div>
+              <div className="space-y-3">
+                {columnTasks.map((task) => (
                   <article
                     key={task.id}
-                    draggable
+                    draggable={status !== "Overdue"}
                     onDragStart={(event) => event.dataTransfer.setData("task-id", task.id)}
                     className="cursor-grab rounded-lg border border-slate-300/60 bg-white/[0.65] p-4 shadow-sm transition hover:-translate-y-1 hover:border-cyan-400 dark:border-white/10 dark:!bg-slate-950/60"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="font-semibold leading-6">{task.title}</h3>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${priorityStyles[task.priority]}`}>
-                        {task.priority}
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${priorityStyles[task.priority] || priorityStyles.Medium}`}>
+                        {task.priority || "Medium"}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      {task.subject} / {task.deadline}
+                    {task.description && <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{task.description}</p>}
+                    <p className="mt-3 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                      <CalendarClock className="h-4 w-4" />
+                      {task.subject || "General"} {task.deadline ? `/ ${deadlineCopy(task.deadline)}` : ""}
                     </p>
-                    <div className="mt-4">
-                      <div className="mb-1 flex justify-between text-xs font-semibold">
-                        <span>Progress</span>
-                        <span>{task.progress}%</span>
+                    {!!task.tags?.length && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {task.tags.map((tag) => <span key={tag} className="rounded-full bg-slate-950/5 px-2 py-1 text-xs font-bold dark:bg-white/10">{tag}</span>)}
                       </div>
-                      <input
-                        aria-label={`Progress for ${task.title}`}
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={task.progress}
-                        onChange={(event) => updateTask(task.id, { progress: Number(event.target.value) })}
-                        className="w-full accent-cyan-500"
-                      />
-                    </div>
+                    )}
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          updateTask(task.id, { progress: 100 });
-                          moveTask(task.id, "done");
-                        }}
+                        onClick={() => updateTask(task.id, { status: taskStatus(task) === "Completed" ? "Pending" : "Completed" })}
                         className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-emerald-400/15 px-3 text-xs font-bold text-emerald-600 transition hover:bg-emerald-400/25 dark:text-emerald-300"
                       >
                         <CheckCircle2 className="h-4 w-4" />
-                        Complete
+                        {taskStatus(task) === "Completed" ? "Reopen" : "Complete"}
                       </button>
                       <button
                         type="button"
@@ -153,10 +154,25 @@ export function Tasks() {
                     </div>
                   </article>
                 ))}
-            </div>
-          </Card>
-        ))}
+                {!columnTasks.length && (
+                  <div className="rounded-lg border border-dashed border-slate-300/80 p-4 text-sm text-slate-500 dark:border-white/15 dark:text-slate-400">
+                    {status === "Pending" ? "Create your first task to start planning." : `No ${status.toLowerCase()} tasks.`}
+                  </div>
+                )}
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </AppShell>
   );
+}
+
+function deadlineCopy(date) {
+  const remaining = daysUntil(date);
+  if (!Number.isFinite(remaining)) return "no deadline";
+  if (remaining < 0) return `${Math.abs(remaining)} days overdue`;
+  if (remaining === 0) return "due today";
+  if (remaining === 1) return "due tomorrow";
+  return `${remaining} days left`;
 }

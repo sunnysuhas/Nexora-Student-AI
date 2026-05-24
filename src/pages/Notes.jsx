@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ImagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { AppShell } from "../layouts/AppShell";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -14,7 +14,7 @@ const colors = {
 };
 
 export function Notes() {
-  const { notes, addNote, updateNote, deleteNote } = useAppStore();
+  const { notes, addNote, updateNote, deleteNote, uploadNoteImage } = useAppStore();
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState("");
@@ -86,6 +86,11 @@ export function Notes() {
                 </span>
                 <h3 className="mt-5 font-display text-xl font-bold">{note.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-300">{note.body}</p>
+                {!!note.images?.length && (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {note.images.map((image) => <img key={image} src={image} alt="" className="h-20 rounded-lg object-cover" />)}
+                  </div>
+                )}
                 <div className="mt-5 grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -108,6 +113,10 @@ export function Notes() {
                     Delete
                   </button>
                 </div>
+                <label className="mt-2 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-violet-400/15 px-3 text-xs font-bold text-violet-700 transition hover:bg-violet-400/25 dark:text-violet-300">
+                  <ImagePlus className="h-4 w-4" /> Upload Image
+                  <input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && uploadNoteImage(note.id, event.target.files[0])} className="hidden" />
+                </label>
               </Card>
             ))}
           </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -10,23 +10,23 @@ import { useAppStore } from "../store/useAppStore";
 const copy = {
   login: {
     title: "Welcome back",
-    subtitle: "Enter your Nexora command center.",
+    subtitle: "Sign in to continue your student planning workspace.",
     cta: "Login",
-    footer: "New here?",
+    footer: "New to Nexora?",
     link: "Create an account",
     to: "/register",
   },
   register: {
-    title: "Create your student OS",
-    subtitle: "Start organizing tasks, notes, reminders, and focus.",
+    title: "Create your Nexora account",
+    subtitle: "Register, verify your email, then complete onboarding.",
     cta: "Create account",
-    footer: "Already have an account?",
+    footer: "Already verified?",
     link: "Login",
     to: "/login",
   },
   forgot: {
     title: "Recover access",
-    subtitle: "We will prepare a reset flow for your account.",
+    subtitle: "Request a reset flow for your Nexora account.",
     cta: "Send reset link",
     footer: "Remembered it?",
     link: "Back to login",
@@ -38,47 +38,74 @@ export function Auth({ mode }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
   const [errors, setErrors] = useState({});
-  const { users, addUser } = useAppStore();
+  const [resetRequested, setResetRequested] = useState(false);
+  const { registerUser, login, forgotPassword, resetPassword, apiStatus, lastError } = useAppStore();
   const navigate = useNavigate();
   const details = copy[mode];
 
   const submit = async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const email = form.get("email")?.toString() || "";
+    const email = form.get("email")?.toString().trim().toLowerCase() || "";
     const password = form.get("password")?.toString() || "";
     const confirmPassword = form.get("confirmPassword")?.toString() || "";
-    const name = form.get("name")?.toString() || "";
-    const username = form.get("username")?.toString() || "";
-    const role = form.get("role")?.toString() || "student";
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedUsername = username.trim().toLowerCase();
+    const otp = form.get("otp")?.toString().trim() || "";
+    const name = form.get("name")?.toString().trim() || "";
+    const username = form.get("username")?.toString().trim().toLowerCase() || "";
     const nextErrors = {};
 
-    if (mode === "register" && name.trim().length < 2) nextErrors.name = "Enter your name.";
-    if (mode === "register" && normalizedUsername.length < 3) nextErrors.username = "Username must be at least 3 characters.";
     if (!/^\S+@\S+\.\S+$/.test(email)) nextErrors.email = "Enter a valid email.";
-    if (mode !== "forgot" && password.length < 6) nextErrors.password = "Password must be at least 6 characters.";
-    if (mode === "register" && password !== confirmPassword) nextErrors.confirmPassword = "Passwords must match.";
-    if (mode === "register" && users.some((user) => user.email.toLowerCase() === normalizedEmail)) {
-      nextErrors.email = "This email already exists in the Nexora demo auth system.";
-    }
-    if (mode === "register" && users.some((user) => user.username.toLowerCase() === normalizedUsername)) {
-      nextErrors.username = "This username is already taken.";
+    if ((mode !== "forgot" || resetRequested) && password.length < 8) nextErrors.password = "Password must be at least 8 characters.";
+    if (mode === "forgot" && resetRequested && otp.length < 4) nextErrors.otp = "Enter the reset OTP.";
+    if (mode === "register") {
+      if (name.length < 2) nextErrors.name = "Enter your full name.";
+      if (username.length < 3) nextErrors.username = "Username must be at least 3 characters.";
+      if (password !== confirmPassword) nextErrors.confirmPassword = "Passwords must match.";
     }
 
     setErrors(nextErrors);
+    setNotice("");
     if (Object.keys(nextErrors).length) return;
 
     setLoading(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 700));
-    if (mode === "register") {
-      addUser({ name: name.trim(), email: normalizedEmail, username: normalizedUsername, role });
+    if (mode === "forgot") {
+      if (resetRequested) {
+        const result = await resetPassword({ email, otp, password });
+        setLoading(false);
+        if (!result.ok) {
+          setErrors({ form: result.error?.message || "Unable to reset password." });
+          return;
+        }
+        setNotice("Password reset complete. You can log in now.");
+        return;
+      }
+      await forgotPassword(email);
+      setLoading(false);
+      setResetRequested(true);
+      setNotice("If this email exists, a reset OTP has been sent.");
+      return;
     }
-    localStorage.setItem("nexora-token", `demo-${Date.now()}`);
+
+    if (mode === "register") {
+      const result = await registerUser({ name, username, email, password });
+      setLoading(false);
+      if (!result.ok) {
+        setErrors({ form: result.reason || "Unable to register." });
+        return;
+      }
+      navigate("/verify-email");
+      return;
+    }
+
+    const result = await login(email, password);
     setLoading(false);
-    navigate("/dashboard");
+    if (!result.ok) {
+      setErrors({ form: result.reason });
+      return;
+    }
+    navigate(result.user.onboardingComplete ? "/dashboard" : "/onboarding");
   };
 
   return (
@@ -92,17 +119,10 @@ export function Auth({ mode }) {
             </span>
             <span className="font-display text-2xl font-bold">Nexora AI</span>
           </Link>
-          <h1 className="font-display text-6xl font-bold leading-none text-balance">Your semester, orchestrated by AI.</h1>
+          <h1 className="font-display text-6xl font-bold leading-none text-balance">Plan your semester before it plans you.</h1>
           <p className="mt-6 text-lg leading-8 text-slate-600 dark:text-slate-300">
-            A cinematic command layer for tasks, deadlines, focus, notes, attendance, and academic clarity.
+            Secure student accounts, onboarding-driven dashboards, attendance intelligence, and AI planning workflows.
           </p>
-          <div className="mt-10 grid grid-cols-3 gap-3">
-            {["JWT-ready", "MongoDB-ready", "Role-ready"].map((label) => (
-              <div key={label} className="glass rounded-lg p-4 text-center font-semibold">
-                {label}
-              </div>
-            ))}
-          </div>
         </motion.div>
       </section>
 
@@ -114,78 +134,56 @@ export function Auth({ mode }) {
           </Link>
           <h2 className="font-display text-3xl font-bold">{details.title}</h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{details.subtitle}</p>
+          {apiStatus === "error" && (
+            <p className="mt-4 rounded-lg bg-amber-400/15 p-3 text-sm font-semibold text-amber-700 dark:text-amber-200">
+              Nexora API is unavailable: {lastError || "please confirm the backend is running."}
+            </p>
+          )}
 
           <form onSubmit={submit} className="mt-8 space-y-4">
             {mode === "register" && (
               <>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold">Name</span>
-                  <Input name="name" placeholder="Your name" />
-                  {errors.name && <span className="mt-1 block text-xs text-rose-500">{errors.name}</span>}
-                </label>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold">Username</span>
-                  <Input name="username" placeholder="suhas" />
-                  {errors.username && <span className="mt-1 block text-xs text-rose-500">{errors.username}</span>}
-                </label>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold">Role</span>
-                  <select
-                    name="role"
-                    className="min-h-11 w-full rounded-lg border border-slate-300/70 bg-white/70 px-4 text-sm font-semibold text-slate-950 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-300/40 dark:border-white/15 dark:!bg-slate-950/60 dark:text-white"
-                  >
-                    <option value="student">Student</option>
-                    <option value="admin">Admin preview</option>
-                  </select>
-                </label>
+                <Field label="Full Name" name="name" placeholder="Your full name" error={errors.name} />
+                <Field label="Username" name="username" placeholder="studentname" error={errors.username} />
               </>
             )}
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-semibold">Email</span>
-              <Input name="email" type="email" placeholder="student@nexora.ai" />
-              {errors.email && <span className="mt-1 block text-xs text-rose-500">{errors.email}</span>}
-            </label>
+            <Field label="Email" name="email" type="email" placeholder="student@example.com" error={errors.email} />
 
             {mode !== "forgot" && (
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Password</span>
-                <span className="relative block">
-                  <Input name="password" type={showPassword ? "text" : "password"} placeholder="Password" className="pr-12" />
-                  <button
-                    type="button"
-                    aria-label="Toggle password visibility"
-                    onClick={() => setShowPassword((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </span>
-                {errors.password && <span className="mt-1 block text-xs text-rose-500">{errors.password}</span>}
-              </label>
+              <PasswordField
+                label="Password"
+                name="password"
+                show={showPassword}
+                setShow={setShowPassword}
+                placeholder="Password"
+                error={errors.password}
+              />
+            )}
+
+            {mode === "forgot" && resetRequested && (
+              <>
+                <Field label="Reset OTP" name="otp" placeholder="Enter OTP" error={errors.otp} />
+                <PasswordField
+                  label="New password"
+                  name="password"
+                  show={showPassword}
+                  setShow={setShowPassword}
+                  placeholder="New password"
+                  error={errors.password}
+                />
+              </>
             )}
 
             {mode === "register" && (
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Confirm password</span>
-                <span className="relative block">
-                  <Input
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirm password"
-                    className="pr-12"
-                  />
-                  <button
-                    type="button"
-                    aria-label="Toggle confirm password visibility"
-                    onClick={() => setShowConfirmPassword((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400"
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </span>
-                {errors.confirmPassword && <span className="mt-1 block text-xs text-rose-500">{errors.confirmPassword}</span>}
-              </label>
+              <PasswordField
+                label="Confirm password"
+                name="confirmPassword"
+                show={showConfirmPassword}
+                setShow={setShowConfirmPassword}
+                placeholder="Confirm password"
+                error={errors.confirmPassword}
+              />
             )}
 
             {mode === "login" && (
@@ -193,14 +191,8 @@ export function Auth({ mode }) {
                 Forgot password?
               </Link>
             )}
-
-            {mode === "register" && (
-              <p className="flex gap-2 rounded-lg bg-cyan-400/10 p-3 text-xs leading-5 text-slate-600 dark:text-slate-300">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-500" />
-                Demo auth stores users locally now and is wired for future JWT, MongoDB, and role-based login.
-              </p>
-            )}
-
+            {notice && <p className="rounded-lg bg-emerald-400/15 p-3 text-sm font-semibold text-emerald-600 dark:text-emerald-300">{notice}</p>}
+            {errors.form && <p className="rounded-lg bg-rose-400/15 p-3 text-sm font-semibold text-rose-600 dark:text-rose-300">{errors.form}</p>}
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Processing..." : details.cta}
             </Button>
@@ -215,5 +207,35 @@ export function Auth({ mode }) {
         </Card>
       </section>
     </div>
+  );
+}
+
+function Field({ label, error, ...props }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-semibold">{label}</span>
+      <Input {...props} />
+      {error && <span className="mt-1 block text-xs text-rose-500">{error}</span>}
+    </label>
+  );
+}
+
+function PasswordField({ label, name, show, setShow, placeholder, error }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-semibold">{label}</span>
+      <span className="relative block">
+        <Input name={name} type={show ? "text" : "password"} placeholder={placeholder} className="pr-12" />
+        <button
+          type="button"
+          aria-label={`Toggle ${label.toLowerCase()} visibility`}
+          onClick={() => setShow((value) => !value)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400"
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </span>
+      {error && <span className="mt-1 block text-xs text-rose-500">{error}</span>}
+    </label>
   );
 }

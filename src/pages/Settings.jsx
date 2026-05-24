@@ -1,92 +1,128 @@
 import { useState } from "react";
-import { Bell, Database, Palette, Shield, SlidersHorizontal, User } from "lucide-react";
+import { Bell, LogOut, Palette, Shield, SlidersHorizontal, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "../layouts/AppShell";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
-import { Modal } from "../components/ui/Modal";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAppStore } from "../store/useAppStore";
-import { backendBlueprint } from "../data/backendBlueprint";
 
 export function Settings() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const { notifications, compactMode, toggleNotifications, toggleCompactMode } = useAppStore();
+  const navigate = useNavigate();
+  const {
+    profile,
+    notifications,
+    compactMode,
+    accentColor,
+    updateProfile,
+    toggleNotifications,
+    toggleCompactMode,
+    setAccentColor,
+    logout,
+  } = useAppStore();
+  const [draft, setDraft] = useState(profile);
+  const [saved, setSaved] = useState(false);
+
+  const save = () => {
+    updateProfile({
+      ...draft,
+      attendanceGoal: Number(draft.attendanceGoal) || 85,
+      dailyStudyHoursGoal: Number(draft.dailyStudyHoursGoal) || 3,
+      focusSessionDuration: Number(draft.focusSessionDuration) || 25,
+    });
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1800);
+  };
+
+  const signOut = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
-    <AppShell title="Settings" eyebrow="Personalization and AI Preferences">
-      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+    <AppShell title="Settings" eyebrow="Account and Productivity Preferences">
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         <Card>
-          <h2 className="font-display text-2xl font-bold">Profile</h2>
+          <h2 className="font-display text-2xl font-bold">Account settings</h2>
           <div className="mt-5 space-y-4">
-            <label className="block">
-              <span className="mb-2 flex items-center gap-2 text-sm font-semibold"><User className="h-4 w-4 text-cyan-500" /> Student name</span>
-              <Input defaultValue="Nexora Student" />
-            </label>
-            <label className="block">
-              <span className="mb-2 flex items-center gap-2 text-sm font-semibold"><Shield className="h-4 w-4 text-cyan-500" /> Academic stream</span>
-              <Input defaultValue="Computer Science" />
-            </label>
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="font-display text-2xl font-bold">Interface</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <SettingRow icon={Palette} title="Theme" body="Switch between cinematic dark and clean light mode.">
-              <ThemeToggle />
-            </SettingRow>
-            <SettingRow icon={Bell} title="Notifications" body="Enable deadline, attendance, and focus reminders.">
-              <Switch checked={notifications} onClick={toggleNotifications} />
-            </SettingRow>
-            <SettingRow icon={SlidersHorizontal} title="Compact mode" body="Make dashboard spacing denser for repeated daily use.">
-              <Switch checked={compactMode} onClick={toggleCompactMode} />
-            </SettingRow>
-            <SettingRow icon={Shield} title="Future AI settings" body="Control model memory, study tone, and personalization.">
-              <span className="rounded-full bg-violet-400/15 px-3 py-1 text-xs font-bold text-violet-600 dark:text-violet-300">Soon</span>
-            </SettingRow>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="mt-4">
-        <h2 className="font-display text-2xl font-bold">Notification preferences</h2>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {["Assignment reminders", "Exam countdown alerts", "Attendance risk warnings"].map((item) => (
-            <label key={item} className="flex items-center justify-between rounded-lg bg-slate-950/5 p-4 text-sm font-semibold dark:!bg-slate-950/50">
-              {item}
-              <input type="checkbox" defaultChecked className="h-5 w-5 accent-cyan-500" />
-            </label>
-          ))}
-        </div>
-      </Card>
-
-      <Card className="mt-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-display text-2xl font-bold">Backend integration plan</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Preview the future Node.js, Express, MongoDB, JWT, notifications, and admin dashboard architecture.
-            </p>
-          </div>
-          <Button onClick={() => setModalOpen(true)} variant="secondary">
-            <Database className="h-4 w-4" />
-            View Plan
-          </Button>
-        </div>
-      </Card>
-
-      <Modal open={modalOpen} title="Nexora Full-stack Roadmap" onClose={() => setModalOpen(false)}>
-        <div className="grid gap-3">
-          {backendBlueprint.map((section) => (
-            <div key={section.title} className="rounded-lg bg-slate-950/5 p-4 dark:bg-white/10">
-              <p className="font-display font-bold">{section.title}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{section.items.join(" / ")}</p>
+            <Field icon={User} label="Full name" value={draft.fullName} onChange={(value) => setDraft({ ...draft, fullName: value })} />
+            <Field icon={Shield} label="Username" value={draft.username} onChange={(value) => setDraft({ ...draft, username: value })} />
+            <Field label="Email" type="email" value={draft.email} onChange={(value) => setDraft({ ...draft, email: value })} />
+            <Field label="College/School" value={draft.college} onChange={(value) => setDraft({ ...draft, college: value })} />
+            <Field label="Course/Branch" value={draft.course} onChange={(value) => setDraft({ ...draft, course: value })} />
+            <Field label="Semester/Year" value={draft.semester} onChange={(value) => setDraft({ ...draft, semester: value })} />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" onClick={save}>Save Profile</Button>
+              <Button type="button" variant="secondary" onClick={signOut}>
+                <LogOut className="h-4 w-4" /> Logout
+              </Button>
             </div>
-          ))}
+            {saved && <p className="rounded-lg bg-emerald-400/15 p-3 text-sm font-semibold text-emerald-700 dark:text-emerald-200">Settings saved.</p>}
+          </div>
+        </Card>
+
+        <div className="grid gap-4">
+          <Card>
+            <h2 className="font-display text-2xl font-bold">Interface</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <SettingRow icon={Palette} title="Theme" body="Switch between cinematic dark and clean light mode.">
+                <ThemeToggle />
+              </SettingRow>
+              <SettingRow icon={Bell} title="Notifications" body="Deadline, exam, and attendance alerts.">
+                <Switch checked={notifications} onClick={toggleNotifications} />
+              </SettingRow>
+              <SettingRow icon={SlidersHorizontal} title="Compact mode" body="Reduce spacing for daily repeated use.">
+                <Switch checked={compactMode} onClick={toggleCompactMode} />
+              </SettingRow>
+              <SettingRow icon={Palette} title="Accent color" body="Choose a highlight color for product surfaces.">
+                <div className="flex gap-2">
+                  {["cyan", "violet", "sky"].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setAccentColor(color)}
+                      className={`h-8 w-8 rounded-full border-2 ${accentColor === color ? "border-slate-950 dark:border-white" : "border-transparent"} ${swatchClass(color)}`}
+                      aria-label={`Use ${color} accent`}
+                    />
+                  ))}
+                </div>
+              </SettingRow>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="font-display text-2xl font-bold">Productivity preferences</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Field label="Daily study goal" type="number" value={draft.dailyStudyHoursGoal} onChange={(value) => setDraft({ ...draft, dailyStudyHoursGoal: value })} />
+              <Field label="Focus duration" type="number" value={draft.focusSessionDuration} onChange={(value) => setDraft({ ...draft, focusSessionDuration: value })} />
+              <Field label="Reminder time" type="time" value={draft.reminderTime} onChange={(value) => setDraft({ ...draft, reminderTime: value })} />
+              <Field label="Attendance goal %" type="number" value={draft.attendanceGoal} onChange={(value) => setDraft({ ...draft, attendanceGoal: value })} />
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {["Deadline reminders", "Attendance alerts", "Email preferences"].map((item) => (
+                <label key={item} className="flex items-center justify-between rounded-lg bg-slate-950/5 p-4 text-sm font-semibold dark:!bg-slate-950/50">
+                  {item}
+                  <input type="checkbox" defaultChecked className="h-5 w-5 accent-cyan-500" />
+                </label>
+              ))}
+            </div>
+          </Card>
         </div>
-      </Modal>
+      </div>
     </AppShell>
+  );
+}
+
+function Field({ icon: Icon, label, value, onChange, type = "text" }) {
+  return (
+    <label className="block">
+      <span className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        {Icon && <Icon className="h-4 w-4 text-cyan-500" />}
+        {label}
+      </span>
+      <Input type={type} value={value || ""} onChange={(event) => onChange(event.target.value)} />
+    </label>
   );
 }
 
@@ -111,4 +147,12 @@ function Switch({ checked, onClick }) {
       <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${checked ? "left-7" : "left-1"}`} />
     </button>
   );
+}
+
+function swatchClass(color) {
+  return {
+    cyan: "bg-cyan-400",
+    violet: "bg-violet-500",
+    sky: "bg-sky-400",
+  }[color];
 }

@@ -7,6 +7,9 @@ const noteSchema = new mongoose.Schema(
     body: { type: String, required: true },
     category: { type: String, default: "Quick Note" },
     color: { type: String, default: "cyan" },
+    pinned: { type: Boolean, default: false },
+    private: { type: Boolean, default: true },
+    images: [String],
   },
   { timestamps: true }
 );

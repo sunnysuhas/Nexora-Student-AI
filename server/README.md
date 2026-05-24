@@ -1,6 +1,6 @@
 # Nexora AI Backend Blueprint
 
-This folder is a backend-ready scaffold for Task 3, Task 4, and Task 5 expansion.
+This folder contains the production-style REST API for Nexora AI.
 
 Planned stack:
 
@@ -11,6 +11,9 @@ Planned stack:
 - Role-based access control
 - Contact API
 - Tasks, notes, attendance, calendar, and notification CRUD APIs
+- Groq-backed student productivity assistant
+- Cloudinary profile and note image uploads
+- Nodemailer Gmail SMTP OTP and security emails
 
 Suggested next step:
 
