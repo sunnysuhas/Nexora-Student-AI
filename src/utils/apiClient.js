@@ -72,17 +72,19 @@ export async function apiRequest(path, options = {}, retry = true) {
     if (refreshed) return apiRequest(path, options, false);
   }
 
-  if (!response.ok) {
+  // FIXED
+if (!response.ok) {
     let message = "Nexora API request failed";
     let payload = {};
     try {
-      payload = await response.json();
+      const text = await response.text();   // read body ONCE
+      payload = text ? JSON.parse(text) : {};
       message = payload.message || message;
     } catch {
-      message = (await response.text()) || message;
+      message = message;
     }
     throw new ApiError(message, response.status, payload);
-  }
+}
 
   return response.status === 204 ? null : response.json();
 }
