@@ -109,20 +109,34 @@ export async function refreshAccessToken() {
 
 export async function apiAvailable() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/health`, { cache: "no-store" });
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+
     return response.ok;
-  } catch {
+  } catch (error) {
+    console.error("API health check failed:", error);
     return false;
   }
 }
 
 export async function assertApiAvailable() {
-  const online = await apiAvailable();
-  if (!online) {
-    throw new Error(
-      `Nexora backend server is offline or blocked by CORS. Confirm the API is running at ${API_BASE_URL} and that this frontend origin is allowed.`
-    );
+  for (let i = 0; i < 3; i++) {
+    const online = await apiAvailable();
+
+    if (online) {
+      return;
+    }
+
+    if (i < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
   }
+
+  throw new Error(
+    `Nexora backend server is offline or blocked by CORS. Confirm the API is running at ${API_BASE_URL}`
+  );
 }
 
 function classifyNetworkError(error) {
