@@ -107,7 +107,7 @@ export async function refreshAccessToken() {
 
 export async function apiAvailable() {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
+    const response = await fetch(`${API_BASE_URL}/api/health`, { cache: "no-store" });
     return response.ok;
   } catch {
     return false;
