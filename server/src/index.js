@@ -21,6 +21,7 @@ const port = process.env.PORT || 5000;
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://nexora-student-ai.vercel.app",
   process.env.CLIENT_URL,
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
   ...(process.env.ALLOWED_ORIGINS || "").split(","),
@@ -40,6 +41,7 @@ app.use(
     credentials: true,
   })
 );
+app.options("*", cors());
 app.use(express.json());
 
 app.get("/api/health", (_request, response) => {
@@ -50,6 +52,13 @@ app.get("/", (_request, response) => {
   response.json({
     success: true,
     message: "Nexora API Running",
+  });
+});
+
+app.get("/test", (_request, response) => {
+  response.json({
+    success: true,
+    message: "Backend working",
   });
 });
 

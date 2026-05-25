@@ -4,7 +4,7 @@ if (!API_BASE_URL) {
   throw new Error("VITE_API_URL is required for Nexora API integration.");
 }
 
-const REQUEST_TIMEOUT_MS = 12000;
+const REQUEST_TIMEOUT_MS = 90000;
 
 export class ApiError extends Error {
   constructor(message, status, payload = {}) {
