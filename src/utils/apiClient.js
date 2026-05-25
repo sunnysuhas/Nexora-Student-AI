@@ -1,6 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
+const RAW_API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
+const API_BASE_URL = RAW_API_BASE_URL && RAW_API_BASE_URL.endsWith("/api") ? RAW_API_BASE_URL : `${RAW_API_BASE_URL || ""}/api`;
 
-if (!API_BASE_URL) {
+if (!RAW_API_BASE_URL) {
   throw new Error("VITE_API_URL is required for Nexora API integration.");
 }
 

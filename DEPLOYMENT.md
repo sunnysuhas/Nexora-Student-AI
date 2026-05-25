@@ -63,6 +63,8 @@ Expected:
 VITE_API_URL=https://your-render-service.onrender.com/api
 ```
 
+Do not use the backend root URL alone here. It must include `/api`.
+
 6. Deploy.
 
 ## 4. Update Backend CORS After Vercel URL Exists
