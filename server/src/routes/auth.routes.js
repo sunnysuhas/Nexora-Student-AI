@@ -13,6 +13,8 @@ import {
   resetPassword,
   updateProfile,
   uploadProfileImage,
+  sendVerificationEmail,
+  verifyEmail,
   verifyOtp,
 } from "../controllers/auth.controller.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -23,6 +25,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 *
 router.post("/register", register);
 router.post("/verify-otp", verifyOtp);
 router.post("/resend-otp", resendOtp);
+router.post("/send-verification-email", requireAuth, sendVerificationEmail);
+router.post("/verify-email", requireAuth, verifyEmail);
 router.post("/login", login);
 router.post("/refresh", refresh);
 router.post("/logout", requireAuth, logout);

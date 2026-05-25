@@ -193,6 +193,8 @@ export const apiRoutes = {
     register: "/auth/register",
     verifyOtp: "/auth/verify-otp",
     resendOtp: "/auth/resend-otp",
+    sendVerificationEmail: "/auth/send-verification-email",
+    verifyEmail: "/auth/verify-email",
     logout: "/auth/logout",
     forgotPassword: "/auth/forgot-password",
     resetPassword: "/auth/reset-password",

@@ -3,7 +3,9 @@ import { apiRequest, apiRoutes, assertApiAvailable, saveTokens } from "../utils/
 export const authService = {
   register: async (payload) => {
     await assertApiAvailable();
-    return apiRequest(apiRoutes.auth.register, { method: "POST", body: payload });
+    const data = await apiRequest(apiRoutes.auth.register, { method: "POST", body: payload });
+    saveTokens(data, true);
+    return data;
   },
   verifyOtp: async (payload) => {
     await assertApiAvailable();
@@ -12,6 +14,14 @@ export const authService = {
   resendOtp: async (payload) => {
     await assertApiAvailable();
     return apiRequest(apiRoutes.auth.resendOtp, { method: "POST", body: payload });
+  },
+  sendVerificationEmail: async () => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.sendVerificationEmail, { method: "POST" });
+  },
+  verifyEmail: async (payload) => {
+    await assertApiAvailable();
+    return apiRequest(apiRoutes.auth.verifyEmail, { method: "POST", body: payload });
   },
   login: async (payload) => {
     await assertApiAvailable();

@@ -101,17 +101,13 @@ export function Auth({ mode }) {
         setErrors({ form: result.reason || "Unable to register." });
         return;
       }
-      navigate("/verify-email");
+      navigate(result.user?.onboardingComplete ? "/dashboard" : "/onboarding");
       return;
     }
 
     const result = await login(email, password, remember);
     setLoading(false);
     if (!result.ok) {
-      if (result.verificationRequired) {
-        navigate("/verify-email");
-        return;
-      }
       setErrors({ form: result.reason });
       return;
     }

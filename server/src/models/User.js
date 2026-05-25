@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
     reminderTime: { type: String, default: "19:00" },
     focusSessionDuration: { type: Number, default: 25 },
     onboardingComplete: { type: Boolean, default: false },
+    isEmailVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
     otpHash: String,
     otpExpiresAt: Date,

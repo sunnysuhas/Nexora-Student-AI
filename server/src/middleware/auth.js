@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { User } from "../models/User.js";
 
 export function requireAuth(request, response, next) {
   const token = request.headers.authorization?.replace("Bearer ", "");
@@ -22,4 +23,15 @@ export function requireRole(role) {
     }
     return next();
   };
+}
+
+export async function requireVerifiedEmail(request, response, next) {
+  const user = await User.findById(request.user?.id);
+  if (!user?.isEmailVerified && !user?.emailVerified) {
+    return response.status(403).json({
+      message: "Email verification is required for this action.",
+      code: "EMAIL_VERIFICATION_REQUIRED",
+    });
+  }
+  return next();
 }

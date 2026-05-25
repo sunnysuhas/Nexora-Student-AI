@@ -8,8 +8,8 @@ import { useAppStore } from "../store/useAppStore";
 
 export function VerifyEmail() {
   const navigate = useNavigate();
-  const { pendingVerificationEmail, verifyUser, resendOtp } = useAppStore();
-  const [email, setEmail] = useState(pendingVerificationEmail);
+  const { currentUser, pendingVerificationEmail, verifyEmail, sendVerificationEmail } = useAppStore();
+  const [email] = useState(currentUser?.email || pendingVerificationEmail);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -31,13 +31,13 @@ export function VerifyEmail() {
     setLoading(true);
     setError("");
     setNotice("");
-    const result = await verifyUser(normalizedEmail, normalizedCode);
+    const result = await verifyEmail(normalizedCode);
     setLoading(false);
     if (!result.ok) {
       setError(result.reason || "Invalid verification code.");
       return;
     }
-    navigate("/login");
+    navigate("/dashboard");
   };
 
   const resend = async () => {
@@ -49,7 +49,7 @@ export function VerifyEmail() {
     setError("");
     setNotice("");
     setResending(true);
-    const result = await resendOtp(normalizedEmail);
+    const result = await sendVerificationEmail();
     setResending(false);
     if (!result.ok) {
       setError(result.reason || "Unable to resend OTP.");
@@ -71,7 +71,7 @@ export function VerifyEmail() {
           Enter the OTP sent by Nexora AI. Verification is required before you can sign in and unlock the planner workspace.
         </p>
         <form onSubmit={submit} className="mt-6 space-y-4">
-          <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" />
+          <Input type="email" value={email} readOnly placeholder="Email" />
           <Input
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}

@@ -9,9 +9,10 @@ export async function seedDevelopmentAdmin() {
   const existing = await User.findOne({ email });
 
   if (existing) {
-    if (existing.role !== "admin" || !existing.emailVerified) {
+    if (existing.role !== "admin" || !existing.emailVerified || !existing.isEmailVerified) {
       existing.role = "admin";
       existing.emailVerified = true;
+      existing.isEmailVerified = true;
       await existing.save();
     }
     return;
@@ -25,5 +26,6 @@ export async function seedDevelopmentAdmin() {
     passwordHash,
     role: "admin",
     emailVerified: true,
+    isEmailVerified: true,
   });
 }

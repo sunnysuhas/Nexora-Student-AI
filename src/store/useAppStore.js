@@ -73,7 +73,7 @@ const mapUser = (user) => {
     id: user.id || user._id,
     name: profile.fullName,
     profile,
-    verified: Boolean(user.verified || user.emailVerified),
+    verified: Boolean(user.verified || user.isEmailVerified || user.emailVerified),
     onboardingComplete: Boolean(user.onboardingComplete),
   };
 };
@@ -213,8 +213,18 @@ export const useAppStore = create(
           authService.register({ name: user.name, username: user.username, email: user.email, password: user.password })
         );
         if (response.ok) {
-          set({ pendingVerificationEmail: user.email });
-          return { ok: true, via: "api" };
+          const createdUser = mapUser(response.result.user);
+          set({
+            isAuthenticated: true,
+            rememberSession: true,
+            currentUser: createdUser,
+            profile: createdUser.profile,
+            onboardingComplete: createdUser.onboardingComplete,
+            pendingVerificationEmail: createdUser.email,
+            ...emptyWorkspace(),
+          });
+          await get().loadWorkspace();
+          return { ok: true, via: "api", user: createdUser, emailDelivery: response.result.emailDelivery };
         }
         return { ok: false, reason: response.error?.message || "Registration failed." };
       },
@@ -226,6 +236,19 @@ export const useAppStore = create(
       resendOtp: async (email) => {
         const response = await withApi(set, () => authService.resendOtp({ email }));
         return response.ok ? { ok: true } : { ok: false, reason: response.error?.message || "Unable to resend OTP." };
+      },
+      sendVerificationEmail: async () => {
+        const response = await withApi(set, () => authService.sendVerificationEmail());
+        return response.ok
+          ? { ok: true, emailDelivery: response.result.emailDelivery, message: response.result.message }
+          : { ok: false, reason: response.error?.message || "Unable to send verification email." };
+      },
+      verifyEmail: async (otp) => {
+        const response = await withApi(set, () => authService.verifyEmail({ otp }));
+        if (!response.ok) return { ok: false, reason: response.error?.message || "Unable to verify email." };
+        const user = mapUser(response.result.user);
+        set({ currentUser: user, profile: user.profile });
+        return { ok: true, user };
       },
       login: async (email, password, remember = true) => {
         const response = await withApi(set, () => authService.login({ email, password, remember }));
@@ -242,15 +265,6 @@ export const useAppStore = create(
           await get().loadWorkspace();
           get().syncNotifications();
           return { ok: true, user };
-        }
-        if (response.error?.code === "EMAIL_NOT_VERIFIED") {
-          set({ pendingVerificationEmail: response.error.payload?.email || email });
-          return {
-            ok: false,
-            verificationRequired: true,
-            email: response.error.payload?.email || email,
-            reason: response.error?.message || "Account not verified. Please verify your email.",
-          };
         }
         return { ok: false, reason: response.error?.message || "Invalid email or password." };
       },

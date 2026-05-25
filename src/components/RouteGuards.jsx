@@ -9,7 +9,7 @@ export function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (!onboardingComplete && location.pathname !== "/onboarding") {
+  if (!onboardingComplete && !["/onboarding", "/verify-email"].includes(location.pathname)) {
     return <Navigate to="/onboarding" replace />;
   }
 

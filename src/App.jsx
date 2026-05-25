@@ -61,7 +61,7 @@ export default function App() {
               <Route path="/login" element={<PublicOnlyRoute><Auth mode="login" /></PublicOnlyRoute>} />
               <Route path="/register" element={<PublicOnlyRoute><Auth mode="register" /></PublicOnlyRoute>} />
               <Route path="/forgot-password" element={<PublicOnlyRoute><Auth mode="forgot" /></PublicOnlyRoute>} />
-              <Route path="/verify-email" element={<PublicOnlyRoute><VerifyEmail /></PublicOnlyRoute>} />
+              <Route path="/verify-email" element={<ProtectedRoute><VerifyEmail /></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />

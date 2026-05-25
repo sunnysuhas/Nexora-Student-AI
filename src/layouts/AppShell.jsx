@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { Bell, ChevronLeft, Plus, Search, Sparkles } from "lucide-react";
+import { Bell, ChevronLeft, MailCheck, Plus, Search, Sparkles, X } from "lucide-react";
 import { navItems, mobileNavItems } from "../data/nav";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Button } from "../components/ui/Button";
@@ -12,9 +12,14 @@ export function AppShell({ children, title, eyebrow }) {
   const [fabOpen, setFabOpen] = useState(false);
   const navigate = useNavigate();
   const currentUser = useAppStore((state) => state.currentUser);
+  const sendVerificationEmail = useAppStore((state) => state.sendVerificationEmail);
+  const verifyEmail = useAppStore((state) => state.verifyEmail);
   const notifications = useAppStore((state) => state.notificationsList);
   const unreadCount = notifications.filter((item) => !item.read).length;
   const privateNavItems = navItems.slice(1).filter((item) => !item.adminOnly || currentUser?.role === "admin");
+  const verificationDismissKey = currentUser?.email ? `nexora-email-verify-dismissed:${currentUser.email}` : "";
+  const [verificationDismissed, setVerificationDismissed] = useState(() => Boolean(verificationDismissKey && localStorage.getItem(verificationDismissKey)));
+  const showEmailBanner = currentUser && !currentUser.verified && !verificationDismissed;
 
   return (
     <div className="min-h-screen px-4 pb-24 pt-4 text-slate-950 dark:text-white lg:pb-8">
@@ -109,6 +114,16 @@ export function AppShell({ children, title, eyebrow }) {
           </div>
         </header>
         <GlobalSearch />
+        {showEmailBanner && (
+          <EmailVerificationBanner
+            onDismiss={() => {
+              if (verificationDismissKey) localStorage.setItem(verificationDismissKey, "true");
+              setVerificationDismissed(true);
+            }}
+            onSend={sendVerificationEmail}
+            onVerify={verifyEmail}
+          />
+        )}
         {children}
       </main>
 
@@ -164,6 +179,95 @@ export function AppShell({ children, title, eyebrow }) {
           );
         })}
       </nav>
+    </div>
+  );
+}
+
+function EmailVerificationBanner({ onDismiss, onSend, onVerify }) {
+  const [otp, setOtp] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const send = async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+    const result = await onSend();
+    setLoading(false);
+    setExpanded(true);
+    if (!result.ok || result.emailDelivery?.sent === false) {
+      setError(result.reason || result.message || "Verification email could not be sent right now. You can continue and retry later.");
+      return;
+    }
+    setMessage("Verification OTP sent. Check your inbox and spam folder.");
+  };
+
+  const verify = async () => {
+    if (!/^\d{6}$/.test(otp)) {
+      setError("Enter the 6-digit OTP from your email.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setMessage("");
+    const result = await onVerify(otp);
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.reason || "Unable to verify email.");
+      return;
+    }
+    setMessage("Email verified. Your account security is updated.");
+    window.setTimeout(onDismiss, 900);
+  };
+
+  return (
+    <div className="mb-6 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4 shadow-glow backdrop-blur-2xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-cyan-400/20 text-cyan-700 dark:text-cyan-200">
+            <MailCheck className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="font-display text-lg font-bold">Verify your email</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Verify your email to secure your account and enable password recovery.
+            </p>
+            {(message || error) && (
+              <p className={cn("mt-2 text-sm font-semibold", error ? "text-rose-600 dark:text-rose-300" : "text-emerald-600 dark:text-emerald-300")}>
+                {error || message}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss email verification reminder"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/60 text-slate-600 transition hover:bg-white dark:bg-white/10 dark:text-slate-300"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        {expanded && (
+          <input
+            value={otp}
+            onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            placeholder="6-digit OTP"
+            className="min-h-11 rounded-lg border border-slate-300/70 bg-white/80 px-4 text-sm text-slate-950 outline-none focus:border-cyan-400 dark:border-white/15 dark:bg-slate-950/70 dark:text-white"
+          />
+        )}
+        <Button type="button" onClick={expanded ? verify : send} disabled={loading}>
+          {loading ? "Processing..." : expanded ? "Verify now" : "Verify now"}
+        </Button>
+        <Button type="button" variant="secondary" onClick={send} disabled={loading}>
+          Resend email
+        </Button>
+      </div>
     </div>
   );
 }
