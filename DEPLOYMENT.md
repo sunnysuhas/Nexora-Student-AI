@@ -64,6 +64,7 @@ VITE_API_URL=https://your-render-service.onrender.com/api
 ```
 
 Do not use the backend root URL alone here. It must include `/api`.
+In Vercel, the key should be `VITE_API_URL` and the value should be only `https://your-render-service.onrender.com/api`. Do not paste `VITE_API_URL=` into the value field.
 
 6. Deploy.
 

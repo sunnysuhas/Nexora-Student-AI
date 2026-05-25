@@ -1,11 +1,12 @@
-const RAW_API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
-const API_BASE_URL = RAW_API_BASE_URL && RAW_API_BASE_URL.endsWith("/api") ? RAW_API_BASE_URL : `${RAW_API_BASE_URL || ""}/api`;
+const RAW_API_BASE_URL = import.meta.env.VITE_API_URL?.trim().replace(/^VITE_API_URL\s*=\s*/i, "").replace(/\/+$/, "");
 
 if (!RAW_API_BASE_URL) {
   throw new Error("VITE_API_URL is required for Nexora API integration.");
 }
 
+const API_BASE_URL = normalizeApiBaseUrl(RAW_API_BASE_URL);
 const REQUEST_TIMEOUT_MS = 90000;
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
 
 export class ApiError extends Error {
   constructor(message, status, payload = {}) {
@@ -45,62 +46,35 @@ export function clearTokens() {
   sessionStorage.removeItem("nexora-refresh-token");
 }
 
-export async function apiRequest(path, options = {}, retry = true) {
-  const token = getAccessToken();
-  const isFormData = options.body instanceof FormData;
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response;
+export async function apiRequest(path, options = {}, retryAuth = true) {
+  const response = await sendWithRenderRetry(path, options);
 
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers,
-      },
-    });
-  } catch (error) {
-    throw classifyNetworkError(error);
-  } finally {
-    window.clearTimeout(timeout);
-  }
-
-  if (response.status === 401 && retry && getRefreshToken()) {
+  if (response.status === 401 && retryAuth && getRefreshToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiRequest(path, options, false);
   }
 
-  // FIXED
-if (!response.ok) {
-    let message = "Nexora API request failed";
-    let payload = {};
-    try {
-      const text = await response.text();   // read body ONCE
-      payload = text ? JSON.parse(text) : {};
-      message = payload.message || message;
-    } catch {
-      message = message;
-    }
-    throw new ApiError(message, response.status, payload);
-}
+  if (!response.ok) {
+    const payload = await parseResponseBody(response);
+    throw new ApiError(payload.message || "Nexora API request failed", response.status, payload);
+  }
 
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  return parseResponseBody(response);
 }
 
 export async function refreshAccessToken() {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
+
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await sendWithRenderRetry("/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      body: { refreshToken },
+      skipAuth: true,
     });
     if (!response.ok) return false;
-    const data = await response.json();
+    const data = await parseResponseBody(response);
     saveTokens({ accessToken: data.accessToken }, Boolean(localStorage.getItem("nexora-refresh-token")));
     return true;
   } catch {
@@ -110,39 +84,107 @@ export async function refreshAccessToken() {
 
 export async function apiAvailable() {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(30000), // increase to 30 seconds
-    });
+    const response = await sendWithRenderRetry("/health", { method: "GET", skipAuth: true, cache: "no-store" }, 3);
     return response.ok;
   } catch (error) {
-    console.error("API health check failed:", error);
+    console.error("[Nexora API] health check failed:", error);
     return false;
   }
 }
 
 export async function assertApiAvailable() {
-  for (let i = 0; i < 5; i++) {  // increase retries to 5
-    const online = await apiAvailable();
-    if (online) return;
-    console.log(`Health check attempt ${i + 1} failed, retrying...`);
-    if (i < 4) await new Promise((resolve) => setTimeout(resolve, 5000)); // 5s gap
+  const online = await apiAvailable();
+  if (!online) {
+    throw new Error(`Nexora backend server is offline or blocked by CORS. Confirm the API is running at ${API_BASE_URL}`);
   }
-  throw new Error(
-    `Nexora backend server is offline or blocked by CORS. Confirm the API is running at ${API_BASE_URL}`
-  );
+}
+
+async function sendWithRenderRetry(path, options = {}, attempts = 2) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await sendOnce(path, options);
+      if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt === attempts) return response;
+      console.warn(`[Nexora API] ${response.status} from ${buildApiUrl(path)}. Retrying ${attempt}/${attempts - 1}...`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) throw classifyNetworkError(error);
+      console.warn(`[Nexora API] request failed for ${buildApiUrl(path)}. Retrying ${attempt}/${attempts - 1}...`, error);
+    }
+    await delay(attempt * 1500);
+  }
+
+  throw classifyNetworkError(lastError);
+}
+
+async function sendOnce(path, options = {}) {
+  const { body, headers, skipAuth, ...requestOptions } = options;
+  const token = getAccessToken();
+  const isFormData = body instanceof FormData;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const url = buildApiUrl(path);
+
+  const request = {
+    ...requestOptions,
+    signal: controller.signal,
+    headers: {
+      ...(body !== undefined && !isFormData ? { "Content-Type": "application/json" } : {}),
+      ...(!skipAuth && token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: serializeBody(body, isFormData),
+  };
+
+  console.info(`[Nexora API] ${request.method || "GET"} ${url}`);
+
+  try {
+    return await fetch(url, request);
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function parseResponseBody(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
+
+function serializeBody(body, isFormData) {
+  if (body === undefined || body === null) return undefined;
+  if (isFormData || typeof body === "string") return body;
+  return JSON.stringify(body);
+}
+
+function buildApiUrl(path) {
+  const cleanPath = String(path || "").replace(/^\/+/, "");
+  return `${API_BASE_URL}/${cleanPath}`;
+}
+
+function normalizeApiBaseUrl(url) {
+  const clean = url.replace(/\/+$/, "");
+  if (/\/api$/i.test(clean)) return clean;
+  return `${clean}/api`;
 }
 
 function classifyNetworkError(error) {
   if (error?.name === "AbortError") {
-    return new Error("Nexora backend request timed out. Check that the API server and MongoDB connection are healthy.");
+    return new Error("Nexora backend request timed out. Render may still be waking up. Please try again.");
   }
   if (error instanceof TypeError) {
-    return new Error(
-      `Network connection failed. Start the backend at ${API_BASE_URL.replace(/\/api$/, "")}, or check CORS for this frontend origin.`
-    );
+    return new Error(`Network connection failed. Check ${API_BASE_URL} and production CORS settings.`);
   }
   return error;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export const apiRoutes = {
