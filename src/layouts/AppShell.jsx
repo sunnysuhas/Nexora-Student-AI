@@ -30,7 +30,7 @@ export function AppShell({ children, title, eyebrow }) {
         )}
       >
         <div className="mb-6 flex items-center justify-between gap-3">
-          <NavLink to="/" className="flex min-w-0 items-center gap-3">
+          <NavLink to="/dashboard" className="flex min-w-0 items-center gap-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-cyan-300 shadow-glow dark:bg-white dark:text-slate-950">
               <Sparkles className="h-5 w-5" />
             </span>
@@ -51,7 +51,7 @@ export function AppShell({ children, title, eyebrow }) {
           </button>
         </div>
 
-        <div className="max-h-[calc(100vh-13rem)] space-y-1 overflow-y-auto pr-1">
+        <div className="max-h-[calc(100vh-6rem)] space-y-1 overflow-y-auto pr-1">
           {privateNavItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -73,17 +73,6 @@ export function AppShell({ children, title, eyebrow }) {
             );
           })}
         </div>
-
-        {!collapsed && (
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="glass rounded-lg p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-600 dark:text-cyan-300">AI Pulse</p>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                {unreadCount} unread alerts, focus block ready.
-              </p>
-            </div>
-          </div>
-        )}
       </aside>
 
       <main className={cn("mx-auto max-w-7xl transition-all", collapsed ? "lg:ml-32" : "lg:ml-72")}>

@@ -153,21 +153,33 @@ export const useAppStore = create(
           return false;
         }
         const response = await withApi(set, () => authService.me());
-        if (!response.ok) {
+        if (response.ok) {
+          const user = mapUser(response.result.user);
+          set({
+            isAuthenticated: true,
+            currentUser: user,
+            profile: user.profile,
+            onboardingComplete: user.onboardingComplete,
+          });
+          await get().loadWorkspace();
+          get().syncNotifications();
+          return true;
+        }
+
+        const status = response.error?.status;
+        const isAuthError = status === 401 || status === 403;
+
+        if (isAuthError) {
           clearTokens();
           set({ isAuthenticated: false, currentUser: null, onboardingComplete: false, ...emptyWorkspace() });
           return false;
         }
-        const user = mapUser(response.result.user);
+
         set({
-          isAuthenticated: true,
-          currentUser: user,
-          profile: user.profile,
-          onboardingComplete: user.onboardingComplete,
+          apiStatus: "error",
+          lastError: response.error?.message || "Backend server is waking up or temporarily unavailable.",
         });
-        await get().loadWorkspace();
-        get().syncNotifications();
-        return true;
+        return false;
       },
       loadWorkspace: async () => {
         const loaders = await Promise.allSettled([
